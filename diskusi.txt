@@ -1,0 +1,109 @@
+customers_dataset => customer_id (candidate primary key)
+order_items_dataset => order_id, order_item_id (candidate primary key)
+order_payments_dataset => order_id, payment_sequential (cand primary key)
+order_reviews_dataset => review_id, order_id (cand primary key)
+oders_dataset => order_id (cand primary key)
+product_dataset => product_id (cand primary key)
+sellers_dataset => seller_id (cand primary key)
+
+--1
+with unique_order as (
+	select distinct on (customer_id) customer_id, order_purchase_timestamp 
+	from orders_dataset
+),
+order_by_year_month as (
+	select extract('year' from order_purchase_timestamp::date) as year,
+	   	extract('month' from order_purchase_timestamp::date) as month, 
+	   	count(1) 
+	from unique_order 
+	group by 1, 2
+	order by 1, 2
+)
+select year, avg(count) from order_by_year_month
+group by 1
+
+
+--2
+with unique_order as (
+	select distinct on (customer_id) customer_id, t1.order_id, order_item_id, order_purchase_timestamp 
+	from order_items_dataset as t1
+	join orders_dataset as t2 on t1.order_id = t2.order_id
+)
+select extract('year' from order_purchase_timestamp::date) as year, count(1)
+from unique_order
+group by 1
+
+
+--3
+with semua_order as (
+	select customer_id, t1.order_id, order_item_id, order_purchase_timestamp 
+	from order_items_dataset as t1
+	join orders_dataset as t2 on t1.order_id = t2.order_id
+),
+customer_order as (
+	select customer_id, extract('year' from order_purchase_timestamp::date) as year, 
+		count(1)
+	from semua_order
+	group by 1, 2
+	having count(1) > 1
+	order by 2
+)
+select year, count(1) from customer_order
+group by 1
+
+
+--4
+with semua_order as (
+	select customer_id, t1.order_id, order_item_id,
+		extract('year' from order_purchase_timestamp::date) as year,
+		extract('month' from order_purchase_timestamp::date) as month
+	from order_items_dataset as t1
+	join orders_dataset as t2 on t1.order_id = t2.order_id
+),
+
+total_semua_order as (
+	select year, month, count(1)
+	from semua_order
+	group by 1, 2
+),
+avg_semua_order as (
+	select year, avg(count) 
+	from total_semua_order
+	group by 1
+)
+select year, avg::int from avg_semua_order
+
+
+###############################################################################################################
+--Mip 3
+--1
+-- Soal 1
+with semua_order as (
+	select customer_id, price, freight_value, t1.order_id, order_item_id,
+		extract('year' from order_purchase_timestamp::date) as year
+	from order_items_dataset as t1
+	join orders_dataset as t2 on t1.order_id = t2.order_id
+WHERE order_status = 'delivered'
+),
+total_revenue as (
+	select year, SUM (price + freight_value)
+	from semua_order
+	group by 1
+)
+select year, SUM::int from total_revenue
+
+--Soal 2
+with semua_order as (
+	select customer_id, order_status, t1.order_id, order_item_id,
+		extract('year' from order_purchase_timestamp::date) as year
+	from order_items_dataset as t1
+	join orders_dataset as t2 on t1.order_id = t2.order_id
+WHERE order_status = 'canceled'
+),
+total_customer as (
+	select year,order_status, count(2)
+	from semua_order
+	group by 2
+)
+select year, COUNT(2) from total_customer
+
